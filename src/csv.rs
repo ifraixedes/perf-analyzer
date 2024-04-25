@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use polars::datatypes::DataType;
 use polars::lazy::frame::{LazyCsvReader, LazyFileListReader, LazyFrame};
-use polars::prelude::{col, AnyValue, Expr, LiteralValue, QuantileInterpolOptions, Schema};
+use polars::prelude::{col, lit, AnyValue, QuantileInterpolOptions, Schema, SortMultipleOptions};
 
 const COLUMNS: &[&str] = &["timestamp", "elapsedtime_seconds", "trace_id", "jaeger_url"];
 
@@ -37,60 +37,82 @@ impl Analyzer {
         Ok(Self { df })
     }
 
-    // TODO: provide all the data of the row.
-    pub fn fastest(&self) -> Result<f64, Error> {
-        self.df
+    pub fn fastest(&self) -> Result<(f64, String), Error> {
+        let df = self.df
             .clone()
-            .select(&[col(COLUMNS[1])])
-            .min()
-            .map_err(|e| Error::Polars {
-                context: format!(r#"creating query for calculating the minimum of "{}" column"#, COLUMNS[1]),
-                source: e,
-            })?
+            .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
+            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([true, false]))
             .collect()
             .map_err(|e| Error::Polars {
-                context: format!(r#"executing the lazy operations for calculating the minimum value of the "{} column"#, COLUMNS[1]),
+                context: format!(
+                             r#"executing the lazy selecting the "{}" and "{}""columns and sorting descending by the "{0}" column"#,
+                             COLUMNS[1],
+                             COLUMNS[2],
+                             ),
                 source: e,
-            })?
-            .column(COLUMNS[1])
-            .map_err(|e| Error::Polars {
-                context: format!(r#"selecting column "{}" from collected data frame""#, COLUMNS[1]),
-                source: e,
-            })?
-            .min::<f64>()
-            .map_err(|e| Error::Polars {
-                context: format!(r#"calculating the minimum value of the column "{}" from collected data frame""#, COLUMNS[1]),
-                source: e,
-            })?
-            .ok_or_else(|| Error::InvalidData { reason: "CSV file is empty".into() })
+            })?;
+
+        let row = df.get(0).ok_or_else(|| Error::InvalidData {
+            reason: "CSV file is empty".into(),
+        })?;
+
+        let (elapsed_time, trace_id) = match &row[..] {
+            [e, t] => (e, t),
+            _ => panic!("BUG: the row should have 2 columns"),
+        };
+
+        let elapsed_time = if let AnyValue::Float64(e) = elapsed_time {
+            e
+        } else {
+            panic!("BUG: the first column should be a float64");
+        };
+
+        let trace_id = if let AnyValue::String(t) = trace_id {
+            t
+        } else {
+            panic!("BUG: the second column should be a String");
+        };
+
+        Ok((*elapsed_time, (*trace_id).into()))
     }
 
-    // TODO: provide all the data of the row.
-    pub fn slowest(&self) -> Result<f64, Error> {
-        self.df
+    pub fn slowest(&self) -> Result<(f64, String), Error> {
+        let df = self.df
             .clone()
-            .select(&[col(COLUMNS[1])])
-            .max()
-            .map_err(|e| Error::Polars {
-                context: format!(r#"creating query for calculating the maximum of "{}" column"#, COLUMNS[1]),
-                source: e,
-            })?
+            .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
+            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([false, false]))
             .collect()
             .map_err(|e| Error::Polars {
-                context: format!(r#"executing the lazy operations for calculating the maximum value of the "{} column"#, COLUMNS[1]),
+                context: format!(
+                             r#"executing the lazy selecting the "{}" and "{}""columns and sorting ascending by the "{0}" column"#,
+                             COLUMNS[1],
+                             COLUMNS[2],
+                             ),
                 source: e,
-            })?
-            .column(COLUMNS[1])
-            .map_err(|e| Error::Polars {
-                context: format!(r#"selecting column "{}" from collected data frame""#, COLUMNS[1]),
-                source: e,
-            })?
-            .max::<f64>()
-            .map_err(|e| Error::Polars {
-                context: format!(r#"calculating the maximum value of the column "{}" from collected data frame""#, COLUMNS[1]),
-                source: e,
-            })?
-            .ok_or_else(|| Error::InvalidData { reason: "CSV file is empty".into() })
+            })?;
+
+        let row = df.get(0).ok_or_else(|| Error::InvalidData {
+            reason: "CSV file is empty".into(),
+        })?;
+
+        let (elapsed_time, trace_id) = match &row[..] {
+            [e, t] => (e, t),
+            _ => panic!("BUG: the row should have 2 columns"),
+        };
+
+        let elapsed_time = if let AnyValue::Float64(e) = elapsed_time {
+            e
+        } else {
+            panic!("BUG: the first column should be a float64");
+        };
+
+        let trace_id = if let AnyValue::String(t) = trace_id {
+            t
+        } else {
+            panic!("BUG: the second column should be a String");
+        };
+
+        Ok((*elapsed_time, (*trace_id).into()))
     }
 
     pub fn percentile(&self, percentile: f64) -> Result<f64, Error> {
@@ -98,10 +120,7 @@ impl Analyzer {
             .df
             .clone()
             .select(&[col(COLUMNS[1])])
-            .quantile(
-                Expr::Literal(LiteralValue::Float64(percentile)),
-                QuantileInterpolOptions::Higher,
-            )
+            .quantile(lit(percentile), QuantileInterpolOptions::Higher)
             .map_err(|e| Error::Polars {
                 context: format!("creating query for calculating the {percentile} percentile"),
                 source: e,

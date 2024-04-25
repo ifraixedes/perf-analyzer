@@ -23,13 +23,13 @@ fn csv_analysis(file: &PathBuf, op: &cli::CSVAnalysis) -> Result<(), Error> {
     match op {
         cli::CSVAnalysis::Fastest => {
             let analyzer = csv::Analyzer::from_csv(file)?;
-            let secs = analyzer.fastest()?;
-            println!("The fastest upload was: {} seconds", secs);
+            let (secs, trace_id) = analyzer.fastest()?;
+            println!("The fastest upload was: {secs} seconds (trace ID: {trace_id})");
         }
         cli::CSVAnalysis::Slowest => {
             let analyzer = csv::Analyzer::from_csv(file)?;
-            let secs = analyzer.slowest()?;
-            println!("The slowest upload was: {} seconds", secs);
+            let (secs, trace_id) = analyzer.slowest()?;
+            println!("The slowest upload was: {secs} seconds (trace ID: {trace_id})");
         }
         cli::CSVAnalysis::Percentile { percentiles } => {
             let analyzer = csv::Analyzer::from_csv(file)?;

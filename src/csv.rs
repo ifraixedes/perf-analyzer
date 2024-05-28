@@ -41,7 +41,7 @@ impl Analyzer {
         let df = self.df
             .clone()
             .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
-            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([true, false]))
+            .sort([COLUMNS[1]], SortMultipleOptions::default())
             .collect()
             .map_err(|e| Error::Polars {
                 context: format!(
@@ -80,7 +80,7 @@ impl Analyzer {
         let df = self.df
             .clone()
             .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
-            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([false, false]))
+            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([true]))
             .collect()
             .map_err(|e| Error::Polars {
                 context: format!(

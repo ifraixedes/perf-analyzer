@@ -26,6 +26,8 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum CSVAnalysis {
+    /// Calculates all the operations using defaults values
+    All,
     /// Calculates the fastest operation
     Fastest,
     /// Calculates the slowest operation

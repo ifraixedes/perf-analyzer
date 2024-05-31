@@ -34,14 +34,13 @@ fn csv_analysis(file: &PathBuf, op: &cli::CSVAnalysis) -> Result<(), Error> {
         cli::CSVAnalysis::Percentile { percentiles } => {
             let analyzer = csv::Analyzer::from_csv(file)?;
 
-            let mut output = String::from("Percentiles\n");
-            for p in percentiles {
-                let pf: f64 = *p as f64 / 100.0;
-                let pv = analyzer.percentile(pf)?;
-                output.push_str(&format!("{}th: {} seconds\n", p, pv));
-            }
+            let pers = percentiles.into_iter().map(|p| *p as f64 / 100.0);
+            let calculated_percentiles = analyzer.percentiles(pers)?;
 
-            print!("{output}");
+            println!("Percentiles");
+            for (i, p) in percentiles.iter().enumerate() {
+                println!("{}th: {} seconds", p, calculated_percentiles[i]);
+            }
         }
     }
 

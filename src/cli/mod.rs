@@ -31,5 +31,8 @@ pub enum CSVAnalysis {
     /// Calculates the slowest operation
     Slowest,
     /// Calculate the percentile from the CSV file
-    Percentile { percentiles: Vec<u8> },
+    Percentile {
+        #[arg(default_values_t = [50, 99])]
+        percentiles: Vec<u8>,
+    },
 }

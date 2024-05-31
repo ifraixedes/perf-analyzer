@@ -1,5 +1,6 @@
 use crate::errors::Error;
 
+use std::iter::IntoIterator;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -115,35 +116,47 @@ impl Analyzer {
         Ok((*elapsed_time, (*trace_id).into()))
     }
 
-    pub fn percentile(&self, percentile: f64) -> Result<f64, Error> {
-        let res = self
-            .df
-            .clone()
-            .select(&[col(COLUMNS[1])])
-            .quantile(lit(percentile), QuantileInterpolOptions::Higher)
-            .map_err(|e| Error::Polars {
-                context: format!("creating query for calculating the {percentile} percentile"),
-                source: e,
-            })?
-            .collect()
-            .map_err(|e| Error::Polars {
-                context: format!(
-                    "executing the lazy operations for calculating the {percentile} percentile"
-                ),
-                source: e,
-            })?;
+    pub fn percentiles(
+        &self,
+        percentiles: impl IntoIterator<Item = f64>,
+    ) -> Result<Vec<f64>, Error> {
+        let mut calculated_percentiles = Vec::new();
+        let lf = self.df.clone().select(&[col(COLUMNS[1])]);
 
-        match res.get(0) {
-            Some(v) => match v[0] {
-                AnyValue::Float64(f) => Ok(f),
-                _ => panic!(
-                    r#"unexpected type returned by quantile operation on "{}" column"#,
-                    COLUMNS[1],
-                ),
-            },
-            None => Err(Error::InvalidData {
-                reason: "CSV file is empty".into(),
-            }),
+        for p in percentiles {
+            let res = lf
+                .clone()
+                .quantile(lit(p), QuantileInterpolOptions::Higher)
+                .map_err(|e| Error::Polars {
+                    context: format!("creating query for calculating the {p} percentile"),
+                    source: e,
+                })?
+                .collect()
+                .map_err(|e| Error::Polars {
+                    context: format!(
+                        "executing the lazy operations for calculating the {p} percentile"
+                    ),
+                    source: e,
+                })?;
+
+            let v = match res.get(0) {
+                Some(v) => match v[0] {
+                    AnyValue::Float64(f) => f,
+                    _ => panic!(
+                        r#"unexpected type returned by quantile operation on "{}" column"#,
+                        COLUMNS[1],
+                    ),
+                },
+                None => {
+                    return Err(Error::InvalidData {
+                        reason: "CSV file is empty".into(),
+                    })
+                }
+            };
+
+            calculated_percentiles.push(v);
         }
+
+        Ok(calculated_percentiles)
     }
 }

@@ -14,7 +14,8 @@ pub enum Commands {
     /// Commands for CSV files which contains the elapsed time of an operation in seconds.
     ///
     /// Each row is the execution of the same operation.
-    /// The CSV file is expected to have 4 columns: timestamp, elapsed time (seconds), trace id, jaeger_url
+    /// The CSV file is expected to have a header and at least 4 columns with the following data:
+    /// timestamp, elapsed time (seconds), trace id
     Csv {
         /// CSV file to process
         #[arg(value_name = "FILE")]

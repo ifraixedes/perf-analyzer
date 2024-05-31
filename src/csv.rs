@@ -2,13 +2,9 @@ use crate::errors::Error;
 
 use std::iter::IntoIterator;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use polars::datatypes::DataType;
 use polars::lazy::frame::{LazyCsvReader, LazyFileListReader, LazyFrame};
-use polars::prelude::{col, lit, AnyValue, QuantileInterpolOptions, Schema, SortMultipleOptions};
-
-const COLUMNS: &[&str] = &["timestamp", "elapsedtime_seconds", "trace_id", "jaeger_url"];
+use polars::prelude::{lit, nth, AnyValue, QuantileInterpolOptions, SortMultipleOptions};
 
 pub struct Analyzer {
     df: LazyFrame,
@@ -16,16 +12,9 @@ pub struct Analyzer {
 
 impl Analyzer {
     pub fn from_csv(file: &PathBuf) -> Result<Self, Error> {
-        let mut schema = Schema::with_capacity(3);
-        schema.with_column(COLUMNS[0].into(), DataType::String);
-        schema.with_column(COLUMNS[1].into(), DataType::Float64);
-        schema.with_column(COLUMNS[2].into(), DataType::String);
-        schema.with_column(COLUMNS[3].into(), DataType::String);
-
         let df = LazyCsvReader::new(file)
             .with_cache(true)
             .with_has_header(true)
-            .with_schema(Some(Arc::new(schema)))
             .finish_no_glob()
             .map_err(|e| Error::Polars {
                 context: format!(
@@ -41,15 +30,13 @@ impl Analyzer {
     pub fn fastest(&self) -> Result<(f64, String), Error> {
         let df = self.df
             .clone()
-            .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
-            .sort([COLUMNS[1]], SortMultipleOptions::default())
+            .select(&[nth(1), nth(2)])
+            .sort_by_exprs(vec![nth(1)], SortMultipleOptions::default())
             .collect()
             .map_err(|e| Error::Polars {
-                context: format!(
-                             r#"executing the lazy selecting the "{}" and "{}""columns and sorting descending by the "{0}" column"#,
-                             COLUMNS[1],
-                             COLUMNS[2],
-                             ),
+                context: String::from(
+                            "executing the lazy selecting the 2nd and 3rd columns and sorting descending by the 2nd column",
+                         ),
                 source: e,
             })?;
 
@@ -80,15 +67,13 @@ impl Analyzer {
     pub fn slowest(&self) -> Result<(f64, String), Error> {
         let df = self.df
             .clone()
-            .select(&[col(COLUMNS[1]), col(COLUMNS[2]) ])
-            .sort([COLUMNS[1]], SortMultipleOptions::default().with_order_descendings([true]))
+            .select(&[nth(1), nth(2)])
+            .sort_by_exprs(vec![nth(1)], SortMultipleOptions::default().with_order_descendings([true]))
             .collect()
             .map_err(|e| Error::Polars {
-                context: format!(
-                             r#"executing the lazy selecting the "{}" and "{}""columns and sorting ascending by the "{0}" column"#,
-                             COLUMNS[1],
-                             COLUMNS[2],
-                             ),
+                context: String::from(
+                            "executing the lazy selecting the 2nd and 3rd columns and sorting ascending by the 2nd column",
+                         ),
                 source: e,
             })?;
 
@@ -121,7 +106,7 @@ impl Analyzer {
         percentiles: impl IntoIterator<Item = f64>,
     ) -> Result<Vec<f64>, Error> {
         let mut calculated_percentiles = Vec::new();
-        let lf = self.df.clone().select(&[col(COLUMNS[1])]);
+        let lf = self.df.clone().select(&[nth(1)]);
 
         for p in percentiles {
             let res = lf
@@ -138,10 +123,7 @@ impl Analyzer {
             let v = match res.get(0) {
                 Some(v) => match v[0] {
                     AnyValue::Float64(f) => f,
-                    _ => panic!(
-                        r#"unexpected type returned by quantile operation on "{}" column"#,
-                        COLUMNS[1],
-                    ),
+                    _ => panic!("unexpected type returned by quantile operation on the 1st column"),
                 },
                 None => {
                     return Err(Error::InvalidData {

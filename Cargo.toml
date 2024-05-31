@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.82"
 clap = { version = "4.5.4", features = ["derive", "wrap_help"] }
-polars = { version = "0.39.2", features = ["lazy"] }
+polars = { version = "0.40.0", features = ["lazy"] }
 thiserror = "1.0.58"

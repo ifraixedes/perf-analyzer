@@ -23,9 +23,9 @@ impl Analyzer {
         schema.with_column(COLUMNS[3].into(), DataType::String);
 
         let df = LazyCsvReader::new(file)
-            .has_header(true)
-            .with_schema(Some(Arc::new(schema)))
             .with_cache(true)
+            .with_has_header(true)
+            .with_schema(Some(Arc::new(schema)))
             .finish_no_glob()
             .map_err(|e| Error::Polars {
                 context: format!(
@@ -127,10 +127,6 @@ impl Analyzer {
             let res = lf
                 .clone()
                 .quantile(lit(p), QuantileInterpolOptions::Higher)
-                .map_err(|e| Error::Polars {
-                    context: format!("creating query for calculating the {p} percentile"),
-                    source: e,
-                })?
                 .collect()
                 .map_err(|e| Error::Polars {
                     context: format!(
